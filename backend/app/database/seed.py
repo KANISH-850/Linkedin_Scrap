@@ -117,12 +117,12 @@ def seed_database(db: Session) -> None:
         {
             "name": "Arxiv AI & ML Research Preprints",
             "adapter_key": "arxiv_research",
-            "source_type": "rss_feed",
+            "source_type": "api",
             "enabled": True,
             "frequency_hours": 24,
             "config_json": {
                 "categories": ["cs.AI", "cs.LG", "cs.CL"],
-                "url": "http://export.arxiv.org/rss/cs.AI+cs.LG+cs.CL",
+                "url": "https://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=15",
             },
         },
         {
@@ -176,27 +176,25 @@ def seed_database(db: Session) -> None:
             },
         },
         {
-            "name": "Devpost Public Hackathons RSS",
+            "name": "ML Contests & AI Hackathons Feed",
             "adapter_key": "generic_rss",
             "source_type": "rss_feed",
-            "enabled": False,
+            "enabled": True,
             "frequency_hours": 24,
             "config_json": {
-                "url": "",
+                "url": "https://mlcontests.com/rss.xml",
                 "category_hint": "hackathons",
-                "note": "Configure a permitted hackathon RSS/Atom feed URL and enable.",
             },
         },
         {
-            "name": "Scholarships & Grants Public RSS",
+            "name": "Class Central AI & Learning Programs",
             "adapter_key": "generic_rss",
             "source_type": "rss_feed",
-            "enabled": False,
-            "frequency_hours": 24,
+            "enabled": True,
+            "frequency_hours": 48,
             "config_json": {
-                "url": "",
-                "category_hint": "scholarships",
-                "note": "Configure a permitted scholarship RSS/Atom feed URL and enable.",
+                "url": "https://www.classcentral.com/report/feed/",
+                "category_hint": "courses",
             },
         },
         {

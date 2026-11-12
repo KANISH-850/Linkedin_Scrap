@@ -20,8 +20,14 @@ DEFAULT_HEADERS = {
 def _strip_html(html_text: str) -> str:
     if not html_text:
         return ""
-    soup = BeautifulSoup(html_text, "html.parser")
-    return " ".join(soup.get_text(" ", strip=True).split())
+    # Avoid BeautifulSoup MarkupResemblesLocatorWarning if input has no tags or looks like URL/filename
+    if "<" not in html_text and ">" not in html_text:
+        return " ".join(html_text.split())
+    try:
+        soup = BeautifulSoup(html_text, "html.parser")
+        return " ".join(soup.get_text(" ", strip=True).split())
+    except Exception:
+        return " ".join(html_text.split())
 
 
 def _infer_job_category(title: str, description: str, tags: List[str] | None = None) -> str:
@@ -203,11 +209,11 @@ class RemoteOKAdapter(BaseSourceAdapter):
 
 
 class ArxivResearchAdapter(BaseSourceAdapter):
-    """Fetches AI/ML/NLP preprints & research topics from arXiv RSS."""
+    """Fetches AI/ML/NLP preprints & research topics from arXiv API/RSS."""
 
     adapter_key = "arxiv_research"
-    source_name = "arXiv CS.AI/LG/CL Feed"
-    source_type = "rss_feed"
+    source_name = "arXiv CS.AI/LG/CL API"
+    source_type = "api"
 
     async def fetch(
         self,
@@ -215,7 +221,11 @@ class ArxivResearchAdapter(BaseSourceAdapter):
         timeout: int = 15,
         max_items: int = 15,
     ) -> List[RawOpportunity]:
-        url = config.get("url") or "http://export.arxiv.org/rss/cs.AI+cs.LG+cs.CL"
+        # Using official arXiv API query which returns reliable atom feeds
+        url = config.get("url") or (
+            f"https://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL"
+            f"&sortBy=submittedDate&sortOrder=descending&max_results={max_items}"
+        )
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             resp = await client.get(url, headers=DEFAULT_HEADERS)
             resp.raise_for_status()
@@ -227,6 +237,13 @@ class ArxivResearchAdapter(BaseSourceAdapter):
             desc = _strip_html(getattr(entry, "summary", ""))
             link = getattr(entry, "link", "")
             author = getattr(entry, "author", None)
+            pub_date = None
+            if hasattr(entry, "published_parsed") and entry.published_parsed:
+                try:
+                    pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+                except Exception:
+                    pub_date = None
+
             results.append(
                 RawOpportunity(
                     title=title,
@@ -237,6 +254,7 @@ class ArxivResearchAdapter(BaseSourceAdapter):
                     category_hint="research",
                     location="Remote / Academic",
                     is_remote=True,
+                    posted_at=pub_date,
                     external_id=link,
                     author_name=author,
                     required_skills=["Artificial Intelligence", "Machine Learning", "Python"],
