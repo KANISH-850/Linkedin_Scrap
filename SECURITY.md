@@ -24,3 +24,4 @@
 ## 5. Secret Hygiene
 - `.env` and local database files are ignored by `.gitignore`.
 - Exception traces in production do not reveal database credentials or secret keys.
+

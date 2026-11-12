@@ -30,3 +30,4 @@ cd backend
 ```bash
 python scripts/setup_admin.py
 ```
+

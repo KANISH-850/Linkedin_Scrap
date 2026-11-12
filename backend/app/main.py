@@ -30,18 +30,7 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    local_scheduler = None
-    if settings.environment.lower() == "development":
-        try:
-            from app.scheduler.scheduler import setup_local_apscheduler
-            local_scheduler = setup_local_apscheduler()
-        except Exception as exc:
-            logger.warning(f"Local APScheduler setup failed: {exc}")
-
     yield
-
-    if local_scheduler:
-        local_scheduler.shutdown(wait=False)
 
 
 def create_app() -> FastAPI:

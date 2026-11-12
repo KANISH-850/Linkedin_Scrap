@@ -67,3 +67,4 @@ Render uses `render.yaml` in this repository for single-click Blueprint deployme
 5. Add Environment Variable:
    - `VITE_API_BASE_URL`: `https://<your-render-backend-url>`
 6. Click **Deploy**.
+

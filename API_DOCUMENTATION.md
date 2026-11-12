@@ -66,3 +66,4 @@
 
 ### `POST /api/discovery/submit`
 - Submit a public URL and/or announcement text for instant AI analysis.
+

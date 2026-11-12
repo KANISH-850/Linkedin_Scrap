@@ -32,3 +32,4 @@
 | 18 | Secret protection | PASS | Code review + `.gitignore` | No secrets committed to Git |
 | 19 | Independent execution | PASS | Render Cron configuration (`30 3 * * *`) | Fully decoupled from development machine |
 | 20 | Real persistent data | PASS | SQLite in dev / PostgreSQL in prod via SQLAlchemy | Real normalized tables, no hardcoded mock data |
+
