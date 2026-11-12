@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: referralpilot-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SCHEDULER_TIMEZONE
+        value: Asia/Kolkata
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_AUTHORIZED_USER_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+
+  - type: cron
+    name: referralpilot-ai-daily-discovery
+    runtime: python
+    rootDir: backend
+    # 03:30 UTC = 09:00 AM IST (Asia/Kolkata, UTC+5:30)
+    schedule: "30 3 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.scheduler.scheduler render_cron
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SCHEDULER_TIMEZONE
+        value: Asia/Kolkata
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_AUTHORIZED_USER_ID
+        sync: false
+
