@@ -72,29 +72,49 @@ class DiscoveryEngine:
                 continue
 
             sources_checked += 1
+            src_retrieved = 0
+            src_valid = 0
+            src_dups = 0
+            src_new = 0
+            t_start = asyncio.get_event_loop().time()
+
             try:
                 raw_items = await adapter.fetch_with_retries(
                     config=source.config_json or {},
                     timeout=settings.discovery_request_timeout_seconds,
                     max_items=settings.discovery_max_items_per_source,
                 )
-                source.last_run_at = datetime.now(timezone.utc)
-                source.last_status = "success"
-                source.last_error = None
-                db.commit()
+                t_duration = round((asyncio.get_event_loop().time() - t_start) * 1000)
+                src_retrieved = len(raw_items)
 
                 for raw in raw_items:
                     opps_discovered += 1
+                    # Basic validity check
+                    if raw.source_url and (raw.source_url.startswith("http://") or raw.source_url.startswith("https://")):
+                        src_valid += 1
+
                     is_new, opp = await self._persist_raw_opportunity(db, raw, source.id, profile_dict, weights)
                     if is_new and opp:
                         new_opps += 1
+                        src_new += 1
                         if opp.score and opp.score.overall_score >= settings.high_match_threshold:
                             high_match_count += 1
-                            # Send Telegram alert for high match
                             try:
                                 await telegram_service.send_opportunity_alert(db, opp)
                             except Exception as alert_exc:
                                 logger.warning(f"Telegram alert error for opp {opp.id}: {alert_exc}")
+                    else:
+                        src_dups += 1
+
+                source.last_run_at = datetime.now(timezone.utc)
+                source.last_status = "success"
+                source.last_error = None
+                source.records_retrieved = src_retrieved
+                source.valid_records = src_valid
+                source.duplicate_records = src_dups
+                source.new_records = src_new
+                source.avg_response_time_ms = int(t_duration)
+                db.commit()
 
             except Exception as exc:
                 sources_failed += 1
@@ -136,7 +156,14 @@ class DiscoveryEngine:
         weights: dict,
     ) -> tuple[bool, Opportunity | None]:
         canonical = canonicalize_url(raw.source_url)
-        dedup = compute_dedup_hash(raw.organization, raw.title, raw.category_hint, canonical)
+        dedup = compute_dedup_hash(
+            raw.organization,
+            raw.title,
+            raw.category_hint,
+            canonical,
+            location=raw.location,
+            experience=raw.experience_requirement or "",
+        )
 
         existing = db.query(Opportunity).filter(Opportunity.dedup_hash == dedup).first()
         if existing:
@@ -167,10 +194,12 @@ class DiscoveryEngine:
         }
         extracted = await ai_service.extract_and_classify(raw.description, raw.title, context)
 
-        # Verification check
-        verif_status = "unverified"
-        if raw.application_url or raw.source_url:
-            verif_status = await verify_url_reachable(raw.application_url or raw.source_url)
+        # Deep Verification check
+        verif_status = "UNVERIFIED"
+        target_check_url = raw.application_url or raw.source_url
+        if target_check_url:
+            from app.discovery.base import verify_url_deep
+            verif_status, dest_title, _ = await verify_url_deep(target_check_url, expected_title=raw.title)
 
         # Build Opportunity record
         opp = Opportunity(

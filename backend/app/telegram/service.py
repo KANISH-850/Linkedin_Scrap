@@ -123,11 +123,38 @@ class TelegramService:
         if db.query(Notification).filter(Notification.dedup_key == dedup_key).first():
             return False
 
-        needs_verif = (
+        # Breakdown by category and verification
+        verified_count = (
             db.query(Opportunity)
-            .filter(Opportunity.verification_status != "verified", Opportunity.active_status == "active")
+            .filter(Opportunity.verification_status == "VERIFIED_ACTIVE", Opportunity.active_status == "active")
             .count()
         )
+        unverified_count = (
+            db.query(Opportunity)
+            .filter(Opportunity.verification_status != "VERIFIED_ACTIVE", Opportunity.active_status == "active")
+            .count()
+        )
+        indian_jobs = (
+            db.query(Opportunity)
+            .filter(
+                Opportunity.category.in_(["fresher_jobs", "internships"]),
+                Opportunity.location.ilike("%India%"),
+                Opportunity.active_status == "active",
+            )
+            .count()
+        )
+        confirmed_refs = (
+            db.query(Opportunity)
+            .filter(
+                Opportunity.referral_classification == "CONFIRMED_REFERRAL_OFFER",
+                Opportunity.active_status == "active",
+            )
+            .count()
+        )
+        hackathons_cnt = db.query(Opportunity).filter(Opportunity.category == "hackathons", Opportunity.active_status == "active").count()
+        scholarships_cnt = db.query(Opportunity).filter(Opportunity.category == "scholarships", Opportunity.active_status == "active").count()
+        research_cnt = db.query(Opportunity).filter(Opportunity.category == "research", Opportunity.active_status == "active").count()
+
         soon = date.today() + timedelta(days=7)
         deadlines_soon = (
             db.query(Opportunity)
@@ -146,10 +173,16 @@ class TelegramService:
         text = (
             f"☀️ <b>ReferralPilot AI — Daily Digest ({today_str})</b>\n\n"
             f"🔎 Sources checked: <b>{run.sources_checked}</b>\n"
-            f"📥 Opportunities discovered: <b>{run.opportunities_discovered}</b>\n"
-            f"✨ New opportunities: <b>{run.new_opportunities}</b>\n"
-            f"🎯 High-match opportunities: <b>{run.high_match_count}</b>\n"
-            f"🧐 Needing manual verification: <b>{needs_verif}</b>\n"
+            f"📥 Opportunities discovered: <b>{run.opportunities_discovered}</b> (<b>+{run.new_opportunities} new</b>)\n"
+            f"🎯 High-match candidates: <b>{run.high_match_count}</b>\n\n"
+            f"<b>📊 Opportunities Breakdown:</b>\n"
+            f"• Verified Active: <b>{verified_count}</b>\n"
+            f"• Unverified: <b>{unverified_count}</b>\n"
+            f"• Indian Internships & Jobs: <b>{indian_jobs}</b>\n"
+            f"• Confirmed Referral Offers: <b>{confirmed_refs}</b>\n"
+            f"• Hackathons & Challenges: <b>{hackathons_cnt}</b>\n"
+            f"• Scholarships & Grants: <b>{scholarships_cnt}</b>\n"
+            f"• Academic & AI Research: <b>{research_cnt}</b>\n\n"
             f"⏰ Deadlines approaching (7d): <b>{deadlines_soon}</b>\n"
             f"📌 Follow-ups due: <b>{followups_due}</b>\n"
             f"⚠️ Sources failed: {failed_line}\n\n"

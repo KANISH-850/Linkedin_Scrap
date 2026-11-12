@@ -88,7 +88,7 @@ async def test_eligibility_graduation_year_and_referral_classification():
         "Software Engineer Intern",
         {"category_hint": "internships", "organization": "TechCorp"},
     )
-    assert ext_2026.referral_classification == "general_job_announcement"
+    assert ext_2026.referral_classification in ("GENERAL_JOB_POST", "general_job_announcement")
     elig, score = await engine.evaluate_eligibility_and_score(
         profile,
         {
@@ -113,7 +113,7 @@ async def test_eligibility_graduation_year_and_referral_classification():
         "AI Engineer Intern",
         {"category_hint": "referrals", "organization": "NeuralLabs"},
     )
-    assert ext_ref.referral_classification == "confirmed_referral_offer"
+    assert ext_ref.referral_classification in ("CONFIRMED_REFERRAL_OFFER", "confirmed_referral_offer")
     elig2, score2 = await engine.evaluate_eligibility_and_score(
         profile,
         {

@@ -299,6 +299,11 @@ class DiscoverySourceOut(BaseModel):
     last_run_at: Optional[datetime] = None
     last_status: Optional[str] = None
     last_error: Optional[str] = None
+    records_retrieved: Optional[int] = 0
+    valid_records: Optional[int] = 0
+    duplicate_records: Optional[int] = 0
+    new_records: Optional[int] = 0
+    avg_response_time_ms: Optional[int] = 0
 
 
 class DiscoverySourceUpdate(BaseModel):

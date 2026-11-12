@@ -115,6 +115,38 @@ def seed_database(db: Session) -> None:
     # 3. Default Discovery Sources (Permitted feeds, APIs, official portals)
     default_sources = [
         {
+            "name": "Hasjob India (HasGeek) Tech & Internships",
+            "adapter_key": "hasjob_feed",
+            "source_type": "rss_feed",
+            "enabled": True,
+            "frequency_hours": 12,
+            "config_json": {
+                "url": "https://hasjob.co/feed",
+            },
+        },
+        {
+            "name": "Unstop Indian Hackathons & Challenges",
+            "adapter_key": "unstop_feed",
+            "source_type": "api",
+            "enabled": True,
+            "frequency_hours": 12,
+            "config_json": {
+                "url": "https://unstop.com/api/public/opportunity/search-result?opportunity=hackathons&per_page=20",
+                "opportunity_type": "hackathons",
+            },
+        },
+        {
+            "name": "Unstop Indian Internships & Hiring",
+            "adapter_key": "unstop_feed",
+            "source_type": "api",
+            "enabled": True,
+            "frequency_hours": 12,
+            "config_json": {
+                "url": "https://unstop.com/api/public/opportunity/search-result?opportunity=internships&per_page=20",
+                "opportunity_type": "internships",
+            },
+        },
+        {
             "name": "Arxiv AI & ML Research Preprints",
             "adapter_key": "arxiv_research",
             "source_type": "api",

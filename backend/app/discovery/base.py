@@ -49,24 +49,6 @@ def normalize_text_key(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
 
 
-def compute_dedup_hash(organization: str, title: str, category: str, canonical_url: str) -> str:
-    """
-    Compute a stable deduplication hash.
-    Uses normalized (organization, title, category) AND canonical_url domain+path
-    so different roles at the same company are never accidentally merged.
-    """
-    org_key = normalize_text_key(organization)
-    title_key = normalize_text_key(title)
-    cat_key = normalize_text_key(category)
-    url_key = canonicalize_url(canonical_url)
-    # If organization & title are both known and non-generic, key primarily on org + title + category
-    if org_key and title_key and org_key not in {"unknown", "not specified"}:
-        raw = f"{cat_key}|{org_key}|{title_key}"
-    else:
-        raw = f"{cat_key}|{url_key}|{title_key}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
 def is_linkedin_url(url: str) -> bool:
     """Return True if the URL points to LinkedIn."""
     if not url:
@@ -94,6 +76,9 @@ class RawOpportunity:
     evidence_excerpt: Optional[str] = None
     required_skills: List[str] = field(default_factory=list)
     preferred_skills: List[str] = field(default_factory=list)
+    education_requirement: Optional[str] = None
+    graduation_year_requirement: Optional[str] = None
+    experience_requirement: Optional[str] = None
     compensation_or_stipend: Optional[str] = None
     duration: Optional[str] = None
     raw_payload: dict[str, Any] = field(default_factory=dict)
@@ -139,25 +124,105 @@ class BaseSourceAdapter(ABC):
         raise RuntimeError(f"Adapter {self.adapter_key} failed after {retries + 1} attempts: {last_exc}")
 
 
-async def verify_url_reachable(url: str, timeout: int = 8) -> str:
+class VerificationState:
+    VERIFIED_ACTIVE = "VERIFIED_ACTIVE"
+    UNVERIFIED = "UNVERIFIED"
+    CLOSED = "CLOSED"
+    EXPIRED = "EXPIRED"
+    INVALID_URL = "INVALID_URL"
+    SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+
+
+def compute_dedup_hash(
+    organization: str,
+    title: str,
+    category: str,
+    canonical_url: str,
+    location: str = "",
+    experience: str = "",
+) -> str:
     """
-    Verify whether an official/source URL is reachable.
-    Never scrapes LinkedIn; returns 'unverified' for LinkedIn URLs.
+    Compute a high-fidelity deduplication hash.
+    Combines normalized (category, organization, title, location, experience) AND canonical_url domain+path.
+    This guarantees:
+      1. Different roles at the same company are never merged.
+      2. Same role in different locations or different experience levels are preserved as distinct.
+      3. Identical jobs cross-posted across multiple aggregator sources are safely deduplicated.
+    """
+    org_key = normalize_text_key(organization)
+    title_key = normalize_text_key(title)
+    cat_key = normalize_text_key(category)
+    loc_key = normalize_text_key(location)
+    exp_key = normalize_text_key(experience)
+    url_key = canonicalize_url(canonical_url)
+
+    if org_key and title_key and org_key not in {"unknown", "not specified"}:
+        # Include location and experience differentiators
+        raw = f"{cat_key}|{org_key}|{title_key}|{loc_key}|{exp_key}"
+    else:
+        raw = f"{cat_key}|{url_key}|{title_key}|{loc_key}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+async def verify_url_deep(
+    url: str,
+    expected_title: str = "",
+    timeout: int = 8,
+) -> tuple[str, Optional[str], Optional[str]]:
+    """
+    Deep verification of destination opportunity.
+    Returns: (verification_state, destination_title, destination_org)
+    Verification states:
+      VERIFIED_ACTIVE | UNVERIFIED | CLOSED | EXPIRED | INVALID_URL | SOURCE_UNAVAILABLE
     """
     if not url:
-        return "unverified"
+        return VerificationState.INVALID_URL, None, None
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return VerificationState.INVALID_URL, None, None
+
     if is_linkedin_url(url):
-        return "unverified"
+        # We do not scrape LinkedIn; keep as UNVERIFIED to respect terms of service
+        return VerificationState.UNVERIFIED, None, None
+
     try:
+        from bs4 import BeautifulSoup
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.head(url, headers={"User-Agent": "ReferralPilotAI/1.0"})
-            if resp.status_code < 400:
-                return "verified"
-            if resp.status_code in (403, 405):
-                # Some career portals block HEAD requests; try lightweight GET
-                resp_get = await client.get(url, headers={"User-Agent": "ReferralPilotAI/1.0"})
-                return "verified" if resp_get.status_code < 400 else "unreachable"
-            return "unreachable"
+            resp = await client.get(url, headers={"User-Agent": "ReferralPilotAI/2.0 (Career Verification Bot)"})
+            if resp.status_code in (404, 410):
+                return VerificationState.CLOSED, None, None
+            if resp.status_code >= 400:
+                return VerificationState.SOURCE_UNAVAILABLE, None, None
+
+            # Inspect returned content
+            soup = BeautifulSoup(resp.text, "html.parser")
+            dest_title = soup.title.string.strip() if soup.title and soup.title.string else None
+            page_text = " ".join(soup.get_text(" ", strip=True).split()).lower()
+
+            # Check expiration / closure keywords
+            closure_phrases = [
+                "this job has expired",
+                "position has been filled",
+                "no longer accepting applications",
+                "applications are closed",
+                "application deadline has passed",
+                "this opportunity is closed",
+                "registration closed",
+                "contest has ended",
+            ]
+            if any(phrase in page_text for phrase in closure_phrases):
+                return VerificationState.CLOSED, dest_title, None
+
+            return VerificationState.VERIFIED_ACTIVE, dest_title, None
+    except httpx.TimeoutException:
+        return VerificationState.SOURCE_UNAVAILABLE, None, None
     except Exception:
-        return "unverified"
+        return VerificationState.UNVERIFIED, None, None
+
+
+async def verify_url_reachable(url: str, timeout: int = 8) -> str:
+    """Backwards-compatible wrapper returning the verification state."""
+    state, _, _ = await verify_url_deep(url, timeout=timeout)
+    return state
 

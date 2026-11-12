@@ -198,6 +198,11 @@ export interface DiscoverySource {
   last_run_at?: string | null;
   last_status?: string | null;
   last_error?: string | null;
+  records_retrieved?: number;
+  valid_records?: number;
+  duplicate_records?: number;
+  new_records?: number;
+  avg_response_time_ms?: number;
 }
 
 export interface DiscoveryRun {

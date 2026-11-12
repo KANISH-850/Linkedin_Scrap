@@ -44,16 +44,38 @@ def _detect_skills(text: str) -> List[str]:
 
 
 def _detect_referral_classification(text: str) -> Tuple[str, float, str | None]:
+    """
+    Evidence-based classification:
+      - CONFIRMED_REFERRAL_OFFER: Author explicitly offers to refer candidates.
+      - EXPLICIT_REFERRAL_REQUEST: Candidate explicitly asking for referral.
+      - HIRING_ANNOUNCEMENT: Team/recruiter hiring announcement with direct message call-to-action.
+      - GENERAL_JOB_POST: Standard job listing without employee referral offer.
+      - UNCLEAR: Ambiguous or insufficient evidence.
+    """
     t = text.lower()
-    if re.search(r"\b(i can refer|happy to refer|dm me for referral|referral available|referring for)\b", t):
-        return ("confirmed_referral_offer", 0.95, "Explicit employee referral offer found in post content.")
-    if re.search(r"\b(anyone can refer|looking for referral|need a referral)\b", t):
-        return ("explicit_referral_request", 0.85, "Request for referral detected.")
-    if re.search(r"\b(we are hiring|my team is hiring|reach out directly|dm if interested)\b", t):
-        return ("hiring_with_possible_referral", 0.70, "Hiring post with direct outreach opportunity.")
-    if re.search(r"\b(apply here|job opening|apply at)\b", t):
-        return ("general_job_announcement", 0.30, "General job announcement without employee referral offer.")
-    return ("unclear_evidence", 0.10, "No clear referral language detected.")
+    # 1. Confirmed referral offer requires explicit author commitment
+    offer_patterns = [
+        r"\b(i can refer|happy to refer|dm me for referral|reach out for referral|offering referrals?|willing to refer)\b",
+        r"\b(send me your resume for referral|drop your resume for referral|message me to be referred)\b",
+    ]
+    for pat in offer_patterns:
+        match = re.search(pat, t)
+        if match:
+            return ("CONFIRMED_REFERRAL_OFFER", 0.95, f"Explicit author referral offer verified: '{match.group(0)}'.")
+
+    # 2. Explicit referral request
+    if re.search(r"\b(anyone can refer|looking for a referral|seeking a referral|need a referral)\b", t):
+        return ("EXPLICIT_REFERRAL_REQUEST", 0.85, "Explicit request for referral from candidate.")
+
+    # 3. Hiring announcement
+    if re.search(r"\b(we are hiring|my team is hiring|i am hiring|our team has an opening|dm me if interested)\b", t):
+        return ("HIRING_ANNOUNCEMENT", 0.70, "Team hiring post with direct outreach opportunity.")
+
+    # 4. General job post
+    if re.search(r"\b(apply here|job opening|apply at|job description|apply online)\b", t):
+        return ("GENERAL_JOB_POST", 0.30, "General job posting without verified author referral.")
+
+    return ("UNCLEAR", 0.10, "Insufficient evidence to classify referral availability.")
 
 
 class HeuristicIntelligenceEngine(BaseLLMClient):
@@ -158,7 +180,11 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
         location_score = 100.0 if (is_rem or "india" in loc_str or "remote" in loc_str) else 60.0
         # 5. Referral & Freshness
         ref_class = opportunity_data.get("referral_classification") or ""
-        ref_fresh_score = 90.0 if ref_class == "confirmed_referral_offer" else (75.0 if ref_class == "hiring_with_possible_referral" else 50.0)
+        ref_fresh_score = (
+            95.0
+            if ref_class == "CONFIRMED_REFERRAL_OFFER"
+            else (75.0 if ref_class == "HIRING_ANNOUNCEMENT" else 50.0)
+        )
 
         # Configurable Weighted Overall
         w_skill = weights.get("skill_match", 0.30)
@@ -202,7 +228,7 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
             if status == "Not eligible"
             else (
                 "Request employee referral with tailored pitch"
-                if ref_class in {"confirmed_referral_offer", "hiring_with_possible_referral"}
+                if ref_class in {"CONFIRMED_REFERRAL_OFFER", "HIRING_ANNOUNCEMENT"}
                 else "Review opportunity details and apply"
             )
         )

@@ -363,7 +363,123 @@ class GenericRSSAdapter(BaseSourceAdapter):
         return results
 
 
+class HasjobAdapter(BaseSourceAdapter):
+    """Fetches verified Indian tech jobs & internships from Hasjob RSS."""
+
+    adapter_key = "hasjob_feed"
+    source_name = "Hasjob India (HasGeek) Feed"
+    source_type = "rss_feed"
+
+    async def fetch(
+        self,
+        config: dict[str, Any],
+        timeout: int = 15,
+        max_items: int = 25,
+    ) -> List[RawOpportunity]:
+        url = config.get("url") or "https://hasjob.co/feed"
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url, headers=DEFAULT_HEADERS)
+            resp.raise_for_status()
+            feed = feedparser.parse(resp.text)
+
+        results: List[RawOpportunity] = []
+        for entry in feed.entries[:max_items]:
+            title = _strip_html(getattr(entry, "title", "Indian Software Role"))
+            raw_summary = getattr(entry, "summary", "")
+            soup = BeautifulSoup(raw_summary, "html.parser")
+            company = "Not specified"
+            loc = "India"
+            strong_tag = soup.find("strong")
+            if strong_tag:
+                company = strong_tag.get_text(strip=True)
+            p_first = soup.find("p")
+            if p_first:
+                p_text = p_first.get_text(" ", strip=True)
+                for city in ["Bangalore", "Bengaluru", "Hyderabad", "Chennai", "Coimbatore", "Pune", "Mumbai", "Delhi", "Gurgaon", "Noida", "Remote"]:
+                    if city.lower() in p_text.lower():
+                        loc = f"{city}, India"
+                        break
+
+            desc = _strip_html(raw_summary)
+            link = getattr(entry, "link", "")
+            cat = _infer_job_category(title, desc)
+            results.append(
+                RawOpportunity(
+                    title=title,
+                    organization=company,
+                    description=desc[:4000],
+                    source_url=link,
+                    application_url=link,
+                    category_hint=cat,
+                    location=loc,
+                    is_remote="remote" in loc.lower(),
+                    external_id=link,
+                    raw_payload={"link": link, "hasjob": True},
+                )
+            )
+        return results
+
+
+class UnstopAdapter(BaseSourceAdapter):
+    """Fetches verified Indian hackathons, challenges, and hiring sprints from Unstop API."""
+
+    adapter_key = "unstop_feed"
+    source_name = "Unstop Hackathons & Student Challenges"
+    source_type = "api"
+
+    async def fetch(
+        self,
+        config: dict[str, Any],
+        timeout: int = 15,
+        max_items: int = 25,
+    ) -> List[RawOpportunity]:
+        opp_type = config.get("opportunity_type", "hackathons")
+        url = config.get("url") or f"https://unstop.com/api/public/opportunity/search-result?opportunity={opp_type}&per_page={max_items}"
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url, headers=DEFAULT_HEADERS)
+            resp.raise_for_status()
+            data = resp.json().get("data", {})
+
+        items = data.get("data", [])[:max_items]
+        results: List[RawOpportunity] = []
+        for it in items:
+            title = it.get("title") or "Student Innovation Challenge"
+            org_obj = it.get("organisation")
+            org_name = org_obj.get("name") if isinstance(org_obj, dict) else (org_obj or "Unstop Partner")
+            slug = it.get("public_url") or it.get("seo_url") or ""
+            link = f"https://unstop.com/{slug.lstrip('/')}" if slug else "https://unstop.com"
+
+            end_date_str = it.get("end_date") or it.get("regn_end_date")
+            dl = None
+            if end_date_str:
+                try:
+                    dl = datetime.fromisoformat(end_date_str[:19]).date()
+                except Exception:
+                    dl = None
+
+            raw_cat = opp_type if opp_type in ["hackathons", "internships", "scholarships"] else "hackathons"
+            desc = f"{title} organized by {org_name}. Register on Unstop before deadline."
+            results.append(
+                RawOpportunity(
+                    title=title,
+                    organization=org_name,
+                    description=desc,
+                    source_url=link,
+                    application_url=link,
+                    category_hint=raw_cat,
+                    location="India / Online",
+                    is_remote=True,
+                    deadline=dl,
+                    external_id=str(it.get("id") or slug),
+                    raw_payload={"unstop_id": it.get("id"), "slug": slug},
+                )
+            )
+        return results
+
+
 ADAPTER_REGISTRY: dict[str, BaseSourceAdapter] = {
+    "hasjob_feed": HasjobAdapter(),
+    "unstop_feed": UnstopAdapter(),
     "remotive_jobs": RemotiveAdapter(),
     "arbeitnow_jobs": ArbeitnowAdapter(),
     "remoteok_feed": RemoteOKAdapter(),

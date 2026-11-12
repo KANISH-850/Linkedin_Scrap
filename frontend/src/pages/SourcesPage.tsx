@@ -29,7 +29,7 @@ export function SourcesPage() {
         {sources?.map((s) => (
           <div
             key={s.id}
-            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"
+            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm hover:border-indigo-500/30 transition"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -51,10 +51,32 @@ export function SourcesPage() {
               </button>
             </div>
 
+            {/* Health Metrics Strip */}
+            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+              <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Retrieved</span>
+                <span className="text-sm font-black text-slate-800 dark:text-slate-200">{s.records_retrieved ?? 0}</span>
+              </div>
+              <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-semibold block">Valid</span>
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{s.valid_records ?? 0}</span>
+              </div>
+              <div className="p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-semibold block">Dups</span>
+                <span className="text-sm font-black text-amber-600 dark:text-amber-400">{s.duplicate_records ?? 0}</span>
+              </div>
+              <div className="p-2 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-semibold block">New</span>
+                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{s.new_records ?? 0}</span>
+              </div>
+            </div>
+
             <div className="text-xs space-y-1 text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="flex justify-between">
-                <span>Frequency:</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Every {s.frequency_hours} hours</span>
+                <span>Latency:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  {s.avg_response_time_ms ? `${s.avg_response_time_ms} ms` : 'N/A'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Last run:</span>

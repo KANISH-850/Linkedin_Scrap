@@ -108,6 +108,11 @@ class DiscoverySource(Base, TimestampMixin):
     last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    records_retrieved: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    valid_records: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    duplicate_records: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_records: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    avg_response_time_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     opportunity_sources: Mapped[List["OpportunitySource"]] = relationship(back_populates="discovery_source")
 
