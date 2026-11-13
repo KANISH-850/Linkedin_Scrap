@@ -252,6 +252,8 @@ class ArxivResearchAdapter(BaseSourceAdapter):
                     source_url=link,
                     application_url=link,
                     category_hint="research",
+                    opportunity_type="RESEARCH_PAPER",
+                    application_status="NOT_APPLICABLE",
                     location="Remote / Academic",
                     is_remote=True,
                     posted_at=pub_date,
@@ -298,6 +300,8 @@ class HuggingFacePapersAdapter(BaseSourceAdapter):
                     source_url=link,
                     application_url=link,
                     category_hint="research",
+                    opportunity_type="RESEARCH_PAPER",
+                    application_status="NOT_APPLICABLE",
                     location="Remote / Open Research",
                     is_remote=True,
                     external_id=paper_id or link,
@@ -443,7 +447,7 @@ class UnstopAdapter(BaseSourceAdapter):
         items = data.get("data", [])[:max_items]
         results: List[RawOpportunity] = []
         for it in items:
-            title = it.get("title") or "Student Innovation Challenge"
+            title = it.get("title") or "Student Innovation Opportunity"
             org_obj = it.get("organisation")
             org_name = org_obj.get("name") if isinstance(org_obj, dict) else (org_obj or "Unstop Partner")
             slug = it.get("public_url") or it.get("seo_url") or ""
@@ -457,7 +461,12 @@ class UnstopAdapter(BaseSourceAdapter):
                 except Exception:
                     dl = None
 
-            raw_cat = opp_type if opp_type in ["hackathons", "internships", "scholarships"] else "hackathons"
+            raw_cat = opp_type if opp_type in ["hackathons", "internships", "scholarships", "jobs"] else "hackathons"
+            opp_type_enum = (
+                "HACKATHON" if raw_cat == "hackathons"
+                else ("INTERNSHIP" if raw_cat == "internships"
+                else ("SCHOLARSHIP" if raw_cat == "scholarships" else "JOB"))
+            )
             desc = f"{title} organized by {org_name}. Register on Unstop before deadline."
             results.append(
                 RawOpportunity(
@@ -467,6 +476,8 @@ class UnstopAdapter(BaseSourceAdapter):
                     source_url=link,
                     application_url=link,
                     category_hint=raw_cat,
+                    opportunity_type=opp_type_enum,
+                    application_status="OPEN",
                     location="India / Online",
                     is_remote=True,
                     deadline=dl,

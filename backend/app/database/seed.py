@@ -147,6 +147,17 @@ def seed_database(db: Session) -> None:
             },
         },
         {
+            "name": "Unstop Indian Scholarships & Grants",
+            "adapter_key": "unstop_feed",
+            "source_type": "api",
+            "enabled": True,
+            "frequency_hours": 24,
+            "config_json": {
+                "url": "https://unstop.com/api/public/opportunity/search-result?opportunity=scholarships&per_page=20",
+                "opportunity_type": "scholarships",
+            },
+        },
+        {
             "name": "Arxiv AI & ML Research Preprints",
             "adapter_key": "arxiv_research",
             "source_type": "api",
@@ -240,7 +251,7 @@ def seed_database(db: Session) -> None:
     ]
 
     for src in default_sources:
-        existing = db.query(DiscoverySource).filter(DiscoverySource.adapter_key == src["adapter_key"]).first()
+        existing = db.query(DiscoverySource).filter(DiscoverySource.name == src["name"]).first()
         if not existing:
             db.add(DiscoverySource(**src))
 

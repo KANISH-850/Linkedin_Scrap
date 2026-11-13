@@ -207,13 +207,17 @@ class DiscoveryEngine:
             organization=raw.organization,
             category=extracted.category or raw.category_hint,
             subcategory=extracted.subcategory,
+            opportunity_type=raw.opportunity_type,
+            application_status=raw.application_status if raw.opportunity_type == "RESEARCH_PAPER" else (
+                "CLOSED" if verif_status in ["CLOSED", "EXPIRED"] else "OPEN"
+            ),
             description=raw.description,
             location=raw.location if raw.location != "Not specified" else extracted.location,
             is_remote=raw.is_remote or extracted.is_remote,
             is_hybrid=raw.is_hybrid or extracted.is_hybrid,
             deadline=raw.deadline,
             posted_at=raw.posted_at,
-            active_status="active",
+            active_status="active" if verif_status != "CLOSED" else "closed",
             verification_status=verif_status,
             canonical_url=canonical,
             source_url=raw.source_url,

@@ -64,6 +64,8 @@ class RawOpportunity:
     description: str
     source_url: str
     category_hint: str = "internships"
+    opportunity_type: str = "JOB"
+    application_status: str = "OPEN"
     subcategory: Optional[str] = None
     location: str = "Not specified"
     is_remote: bool = False
