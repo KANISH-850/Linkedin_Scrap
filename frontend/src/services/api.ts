@@ -12,7 +12,7 @@ import type {
   UserProfile,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
 const TOKEN_KEY = 'rp_access_token';
 
