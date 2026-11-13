@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/:match*",
+      "destination": "https://linkedin-scrap-q1zb.onrender.com/api/:match*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://linkedin-scrap-q1zb.onrender.com/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
