@@ -123,23 +123,31 @@ class TelegramService:
         if db.query(Notification).filter(Notification.dedup_key == dedup_key).first():
             return False
 
-        # Breakdown by category and verification
-        verified_count = (
+        # Breakdown by opportunity_type and application_status
+        active_vacancies = (
             db.query(Opportunity)
-            .filter(Opportunity.verification_status == "VERIFIED_ACTIVE", Opportunity.active_status == "active")
+            .filter(
+                Opportunity.opportunity_type.in_(["JOB", "INTERNSHIP"]),
+                Opportunity.application_status == "OPEN",
+                Opportunity.verification_status == "VERIFIED_ACTIVE",
+            )
             .count()
         )
         unverified_count = (
             db.query(Opportunity)
-            .filter(Opportunity.verification_status != "VERIFIED_ACTIVE", Opportunity.active_status == "active")
+            .filter(
+                Opportunity.opportunity_type.in_(["JOB", "INTERNSHIP"]),
+                Opportunity.verification_status != "VERIFIED_ACTIVE",
+                Opportunity.application_status == "OPEN",
+            )
             .count()
         )
         indian_jobs = (
             db.query(Opportunity)
             .filter(
-                Opportunity.category.in_(["fresher_jobs", "internships"]),
+                Opportunity.opportunity_type.in_(["JOB", "INTERNSHIP"]),
                 Opportunity.location.ilike("%India%"),
-                Opportunity.active_status == "active",
+                Opportunity.application_status == "OPEN",
             )
             .count()
         )
@@ -147,13 +155,31 @@ class TelegramService:
             db.query(Opportunity)
             .filter(
                 Opportunity.referral_classification == "CONFIRMED_REFERRAL_OFFER",
-                Opportunity.active_status == "active",
+                Opportunity.application_status == "OPEN",
             )
             .count()
         )
-        hackathons_cnt = db.query(Opportunity).filter(Opportunity.category == "hackathons", Opportunity.active_status == "active").count()
-        scholarships_cnt = db.query(Opportunity).filter(Opportunity.category == "scholarships", Opportunity.active_status == "active").count()
-        research_cnt = db.query(Opportunity).filter(Opportunity.category == "research", Opportunity.active_status == "active").count()
+        hackathons_cnt = (
+            db.query(Opportunity)
+            .filter(
+                Opportunity.opportunity_type == "HACKATHON",
+                Opportunity.application_status == "OPEN",
+            )
+            .count()
+        )
+        scholarships_cnt = (
+            db.query(Opportunity)
+            .filter(
+                Opportunity.opportunity_type == "SCHOLARSHIP",
+                Opportunity.application_status == "OPEN",
+            )
+            .count()
+        )
+        research_cnt = (
+            db.query(Opportunity)
+            .filter(Opportunity.opportunity_type == "RESEARCH_PAPER")
+            .count()
+        )
 
         soon = date.today() + timedelta(days=7)
         deadlines_soon = (
@@ -176,13 +202,13 @@ class TelegramService:
             f"📥 Opportunities discovered: <b>{run.opportunities_discovered}</b> (<b>+{run.new_opportunities} new</b>)\n"
             f"🎯 High-match candidates: <b>{run.high_match_count}</b>\n\n"
             f"<b>📊 Opportunities Breakdown:</b>\n"
-            f"• Verified Active: <b>{verified_count}</b>\n"
-            f"• Unverified: <b>{unverified_count}</b>\n"
+            f"• Verified Active Vacancies: <b>{active_vacancies}</b>\n"
+            f"• Unverified Vacancies: <b>{unverified_count}</b>\n"
             f"• Indian Internships & Jobs: <b>{indian_jobs}</b>\n"
             f"• Confirmed Referral Offers: <b>{confirmed_refs}</b>\n"
             f"• Hackathons & Challenges: <b>{hackathons_cnt}</b>\n"
             f"• Scholarships & Grants: <b>{scholarships_cnt}</b>\n"
-            f"• Academic & AI Research: <b>{research_cnt}</b>\n\n"
+            f"• AI/ML Research Preprints: <b>{research_cnt}</b>\n\n"
             f"⏰ Deadlines approaching (7d): <b>{deadlines_soon}</b>\n"
             f"📌 Follow-ups due: <b>{followups_due}</b>\n"
             f"⚠️ Sources failed: {failed_line}\n\n"

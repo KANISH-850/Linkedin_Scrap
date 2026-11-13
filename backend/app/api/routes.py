@@ -488,10 +488,24 @@ def get_dashboard_summary(db: Session = Depends(get_db), _: UserAccount = Depend
     today = date.today()
     soon = today + timedelta(days=7)
 
-    new_opps = db.query(Opportunity).filter(Opportunity.tracking_status == "NEW").count()
+    # Exclude research papers and closed opportunities from active/new counts
+    new_opps = (
+        db.query(Opportunity)
+        .filter(
+            Opportunity.tracking_status == "NEW",
+            Opportunity.opportunity_type != "RESEARCH_PAPER",
+            Opportunity.application_status == "OPEN",
+        )
+        .count()
+    )
     high_match = (
         db.query(OpportunityScore)
-        .filter(OpportunityScore.overall_score >= settings.high_match_threshold)
+        .join(Opportunity, OpportunityScore.opportunity_id == Opportunity.id)
+        .filter(
+            OpportunityScore.overall_score >= settings.high_match_threshold,
+            Opportunity.opportunity_type != "RESEARCH_PAPER",
+            Opportunity.application_status == "OPEN",
+        )
         .count()
     )
     referrals_in_prog = (
@@ -508,6 +522,25 @@ def get_dashboard_summary(db: Session = Depends(get_db), _: UserAccount = Depend
     )
     fups_due = db.query(FollowUp).filter(FollowUp.status == "pending", FollowUp.due_date <= today).count()
     total_opps = db.query(Opportunity).count()
+    
+    active_vacancies = (
+        db.query(Opportunity)
+        .filter(
+            Opportunity.opportunity_type.in_(["JOB", "INTERNSHIP"]),
+            Opportunity.application_status == "OPEN",
+        )
+        .count()
+    )
+    research_papers = (
+        db.query(Opportunity)
+        .filter(Opportunity.opportunity_type == "RESEARCH_PAPER")
+        .count()
+    )
+    closed_opps = (
+        db.query(Opportunity)
+        .filter(Opportunity.application_status == "CLOSED")
+        .count()
+    )
     latest_run = db.query(DiscoveryRun).order_by(DiscoveryRun.started_at.desc()).first()
 
     return DashboardSummaryOut(
@@ -519,6 +552,9 @@ def get_dashboard_summary(db: Session = Depends(get_db), _: UserAccount = Depend
         upcoming_deadlines=deadlines,
         follow_ups_due=fups_due,
         total_opportunities=total_opps,
+        active_vacancies=active_vacancies,
+        research_papers=research_papers,
+        closed_opportunities=closed_opps,
         latest_run=DiscoveryRunOut.model_validate(latest_run) if latest_run else None,
     )
 
@@ -526,12 +562,26 @@ def get_dashboard_summary(db: Session = Depends(get_db), _: UserAccount = Depend
 @router.get("/api/dashboard/analytics", response_model=DashboardAnalyticsOut, tags=["Dashboard"])
 def get_dashboard_analytics(db: Session = Depends(get_db), _: UserAccount = Depends(get_current_user)):
     cat_rows = db.query(Opportunity.category, func.count(Opportunity.id)).group_by(Opportunity.category).all()
-    by_category = [AnalyticsSeriesPoint(label=r[0], count=r[1]) for r in cat_rows]
+    by_category = [AnalyticsSeriesPoint(label=r[0] or "other", count=r[1]) for r in cat_rows]
+
+    opp_type_rows = (
+        db.query(Opportunity.opportunity_type, func.count(Opportunity.id))
+        .group_by(Opportunity.opportunity_type)
+        .all()
+    )
+    by_opportunity_type = [AnalyticsSeriesPoint(label=r[0] or "OTHER", count=r[1]) for r in opp_type_rows]
+
+    app_status_rows = (
+        db.query(Opportunity.application_status, func.count(Opportunity.id))
+        .group_by(Opportunity.application_status)
+        .all()
+    )
+    by_application_status = [AnalyticsSeriesPoint(label=r[0] or "OPEN", count=r[1]) for r in app_status_rows]
 
     status_rows = (
         db.query(Opportunity.tracking_status, func.count(Opportunity.id)).group_by(Opportunity.tracking_status).all()
     )
-    application_pipeline = [AnalyticsSeriesPoint(label=r[0], count=r[1]) for r in status_rows]
+    application_pipeline = [AnalyticsSeriesPoint(label=r[0] or "unknown", count=r[1]) for r in status_rows]
 
     # Score distribution buckets
     scores = [s[0] for s in db.query(OpportunityScore.overall_score).all()]
@@ -567,7 +617,7 @@ def get_dashboard_analytics(db: Session = Depends(get_db), _: UserAccount = Depe
         .group_by(Opportunity.tracking_status)
         .all()
     )
-    outreach_status = [AnalyticsSeriesPoint(label=r[0], count=r[1]) for r in outreach_rows]
+    outreach_status = [AnalyticsSeriesPoint(label=r[0] or "unknown", count=r[1]) for r in outreach_rows]
 
     return DashboardAnalyticsOut(
         discovered_over_time=discovered_over_time,
@@ -575,6 +625,8 @@ def get_dashboard_analytics(db: Session = Depends(get_db), _: UserAccount = Depe
         application_pipeline=application_pipeline,
         score_distribution=score_distribution,
         outreach_status=outreach_status,
+        by_opportunity_type=by_opportunity_type,
+        by_application_status=by_application_status,
     )
 
 
