@@ -92,26 +92,26 @@ def _detect_referral_classification(text: str) -> Tuple[str, float, str | None]:
         match = re.search(r"\b(apply (?:at|online|via|through)|careers?\.[a-z0-9\.\-]+)\b", t)
         return ("GENERAL_JOB_POST", 0.50, f"Standard job post directing to online application: '{match.group(0)}'.")
 
-    # 3. Hiring announcement (team/company hiring announcement)
+    # 3. Hiring announcement (first-person team / recruiter announcement)
     hiring_patterns = [
-        r"\b(we are hiring|my team is hiring|i am hiring|our team has an opening)\b",
-        r"\b([a-z0-9\.\-]+ is hiring|now hiring|hiring for multiple|startup is hiring)\b",
-        r"\b(excited to announce (?:that )?(?:we are|our|startup)?\s*hiring)\b",
-        r"\b(dm (?:me )?if interested|reach out directly if interested|interested candidates can dm)\b"
+        r"\b(we are hiring|my team is hiring|i am hiring|our team (?:has|is)|our company is hiring)\b",
+        r"\b(hiring for multiple|excited to announce (?:that )?(?:we are|our|startup)?\s*hiring)\b",
+        r"\b(dm (?:me )?if interested|reach out directly if interested|interested candidates can dm)\b",
     ]
     for pat in hiring_patterns:
         match = re.search(pat, t)
         if match:
             return ("HIRING_ANNOUNCEMENT", 0.70, f"Team hiring announcement verified: '{match.group(0)}'.")
 
-    # 4. General job post (advertisement, corporate announcement, application instructions)
+    # 4. General job post (advertisement, corporate vacancy, application instructions)
     general_patterns = [
-        r"\b(role open|job opening|job post|job description|apply here|apply now|recruiting for)\b",
+        r"\b(apply (?:through|at|via|here|online)|job opening|job post|job description|apply now|role open)\b",
+        r"\b([a-z0-9\.\-]+ is hiring|now hiring|careers? opening|recruiting for)\b",
     ]
     for pat in general_patterns:
         match = re.search(pat, t)
         if match:
-            return ("GENERAL_JOB_POST", 0.35, f"General job posting verified: '{match.group(0)}'.")
+            return ("GENERAL_JOB_POST", 0.50, f"General job posting verified: '{match.group(0)}'.")
 
     return ("UNCLEAR", 0.10, "Insufficient evidence to classify referral availability.")
 
@@ -204,9 +204,20 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
                 f"Role targets senior/experienced professionals ({opportunity_data.get('title')}); candidate is a 2028 undergraduate."
             )
 
+        # Work authorization / domestic citizenship requirement for onsite foreign role
+        if re.search(r"\b(us citizens? only|security clearance required|must be a us citizen|authorized to work in the (?:us|u\.s\.) without sponsorship|no (?:visa )?sponsorship)\b", desc_lower):
+            if not opportunity_data.get("is_remote", False) and "india" not in (opportunity_data.get("location") or "").lower():
+                disqualifying.append(
+                    "Requires domestic citizenship or authorization without sponsorship for onsite foreign role."
+                )
+
         # Immediate joining requirement flag
         if re.search(r"\b(immediate joiner|can join immediately|available immediately)\b", desc_lower):
             questions.append("Requires immediate joining. Verify if student schedule / college NOC permits.")
+
+        # Flag when requirements are sparse/unspecified
+        if not opp_skills and not grad_req and not exp_req and len(desc_lower) < 400:
+            questions.append("Eligibility criteria not specified in posting. Verify degree/batch requirements directly.")
 
         if disqualifying:
             status = "Not eligible"

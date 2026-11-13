@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.discovery.adapters import ADAPTER_REGISTRY, RawOpportunity
 from app.discovery.base import (
+    VerificationState,
     canonicalize_url,
     compute_dedup_hash,
     verify_url_reachable,
@@ -201,6 +202,22 @@ class DiscoveryEngine:
             from app.discovery.base import verify_url_deep
             verif_status, dest_title, _ = await verify_url_deep(target_check_url, expected_title=raw.title)
 
+        # Determine application status
+        if raw.opportunity_type == "RESEARCH_PAPER":
+            app_status = "NOT_APPLICABLE"
+        elif raw.deadline and raw.deadline < date.today():
+            app_status = "EXPIRED"
+        elif verif_status in [VerificationState.CLOSED, "CLOSED"]:
+            app_status = "CLOSED"
+        elif verif_status in [VerificationState.EXPIRED, "EXPIRED"]:
+            app_status = "EXPIRED"
+        elif verif_status == VerificationState.VERIFIED_ACTIVE:
+            app_status = "OPEN"
+        elif verif_status == VerificationState.SOURCE_UNAVAILABLE:
+            app_status = "UNKNOWN"
+        else:
+            app_status = "UNVERIFIED"
+
         # Build Opportunity record
         opp = Opportunity(
             title=raw.title,
@@ -208,16 +225,14 @@ class DiscoveryEngine:
             category=extracted.category or raw.category_hint,
             subcategory=extracted.subcategory,
             opportunity_type=raw.opportunity_type,
-            application_status=raw.application_status if raw.opportunity_type == "RESEARCH_PAPER" else (
-                "CLOSED" if verif_status in ["CLOSED", "EXPIRED"] else "OPEN"
-            ),
+            application_status=app_status,
             description=raw.description,
             location=raw.location if raw.location != "Not specified" else extracted.location,
             is_remote=raw.is_remote or extracted.is_remote,
             is_hybrid=raw.is_hybrid or extracted.is_hybrid,
             deadline=raw.deadline,
             posted_at=raw.posted_at,
-            active_status="active" if verif_status != "CLOSED" else "closed",
+            active_status="active" if verif_status not in ["CLOSED", "EXPIRED"] else "closed",
             verification_status=verif_status,
             canonical_url=canonical,
             source_url=raw.source_url,

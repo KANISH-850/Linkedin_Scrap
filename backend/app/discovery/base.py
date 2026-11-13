@@ -212,11 +212,25 @@ async def verify_url_deep(
                 "this opportunity is closed",
                 "registration closed",
                 "contest has ended",
+                "registration has ended",
+                "event expired",
             ]
             if any(phrase in page_text for phrase in closure_phrases):
                 return VerificationState.CLOSED, dest_title, None
 
-            return VerificationState.VERIFIED_ACTIVE, dest_title, None
+            # Check explicit application action or button
+            has_app_action = False
+            for a in soup.find_all("a", href=True):
+                href = a["href"].lower()
+                text = a.get_text().strip().lower()
+                if any(k in href or k in text for k in ["apply", "register", "submit application", "sign up to apply"]):
+                    has_app_action = True
+                    break
+
+            if has_app_action or any(k in page_text for k in ["apply now", "register now", "application process", "eligible candidates can apply", "how to apply"]):
+                return VerificationState.VERIFIED_ACTIVE, dest_title, None
+
+            return VerificationState.UNVERIFIED, dest_title, None
     except httpx.TimeoutException:
         return VerificationState.SOURCE_UNAVAILABLE, None, None
     except Exception:
