@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users2,
@@ -21,6 +22,8 @@ import {
   X,
   PlusCircle,
   PlayCircle,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -53,14 +56,22 @@ export function DashboardLayout() {
   const [submitSuccess, setSubmitSuccess] = useState('');
   const navigate = useNavigate();
 
+  const queryClient = useQueryClient();
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 5000);
+  };
+
   const handleRunDiscovery = async () => {
     try {
       setRunningDiscovery(true);
       await api.runDiscovery();
-      alert('Discovery run triggered successfully! Opportunities updated.');
-      window.location.reload();
+      await queryClient.invalidateQueries();
+      showToast('Live discovery completed! Opportunities updated.', 'success');
     } catch (err: any) {
-      alert(`Discovery run failed: ${err.message}`);
+      showToast(`Discovery run failed: ${err.message}`, 'error');
     } finally {
       setRunningDiscovery(false);
     }
@@ -197,7 +208,23 @@ export function DashboardLayout() {
       </aside>
 
       {/* Main Content Pane */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 relative">
+        {toastMessage && (
+          <div
+            className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium transition-all ${
+              toastMessage.type === 'success'
+                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+                : 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+            }`}
+          >
+            {toastMessage.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            )}
+            <span>{toastMessage.text}</span>
+          </div>
+        )}
         <Outlet />
       </main>
 

@@ -77,6 +77,23 @@ export function OverviewPage() {
         </div>
       </div>
 
+      {/* Empty State Discovery Callout */}
+      {(summary?.active_vacancies ?? 0) === 0 && (summary?.research_papers ?? 0) === 0 && (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/40 to-slate-900/40 border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Initial Setup Complete
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-slate-100">Ready to Discover Indian Career Opportunities</h3>
+            <p className="text-xs text-slate-400 max-w-2xl">
+              Your Supabase database and profile are configured. Click <strong className="text-emerald-400">Run Discovery Now</strong> in the left sidebar to pull live vacancies, internships, hackathons, and scholarships.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((card, idx) => {
