@@ -1,5 +1,6 @@
 """FastAPI application entry point for ReferralPilot AI."""
 
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,18 +62,35 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["System"])
     def health_check():
         db_ok = False
+        db_latency_ms = None
+        opp_count = 0
         try:
+            start_t = time.perf_counter()
             db = SessionLocal()
             db.execute(text("SELECT 1"))
+            db_latency_ms = round((time.perf_counter() - start_t) * 1000, 2)
+            try:
+                opp_count = db.execute(text("SELECT count(*) FROM opportunities")).scalar() or 0
+            except Exception:
+                opp_count = 0
             db_ok = True
             db.close()
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"Health check database ping failed: {exc}")
             db_ok = False
+
         return {
             "status": "healthy" if db_ok else "degraded",
             "app": settings.app_name,
+            "version": "1.0.0",
             "environment": settings.environment,
-            "database": "connected" if db_ok else "disconnected",
+            "database": {
+                "status": "connected" if db_ok else "disconnected",
+                "latency_ms": db_latency_ms,
+            },
+            "stats": {
+                "persisted_opportunities": opp_count,
+            },
         }
 
     app.include_router(router)
