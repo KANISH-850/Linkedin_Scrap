@@ -71,10 +71,75 @@ If configuring the service manually in the Render dashboard:
 ## 4. Frontend Deployment (Vercel)
 
 1. In [Vercel](https://vercel.com), click **Add New** -> **Project**.
-2. Select your repository.
+2. Select your repository `Linkedin_Scrap`.
 3. Set **Root Directory** to `frontend`.
 4. Framework Preset: **Vite**.
 5. Add Environment Variable:
-   - `VITE_API_BASE_URL`: `https://<your-render-backend-url>`
+   - **Key**: `VITE_API_BASE_URL`
+   - **Value**: `https://<your-render-backend-url>` (e.g. `https://linkedin-scrap-q1zb.onrender.com`)
+   - **Type**: Select **Config** (not Secret, as Vite framework prefixes expose values to the client bundle).
 6. Click **Deploy**.
+
+### Vercel Reverse Proxy Architecture
+The repository includes `frontend/vercel.json` and root `vercel.json` with reverse-proxy rewrites:
+```json
+{
+  "rewrites": [
+    { "source": "/api/:match*", "destination": "https://<your-render-backend-url>/api/:match*" },
+    { "source": "/health", "destination": "https://<your-render-backend-url>/health" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
+This architecture prevents `405 Method Not Allowed` errors by proxying all `/api/*` POST/PUT/DELETE requests directly to the FastAPI backend, while preserving client-side SPA routing for all dashboard views.
+
+---
+
+## 5. Operations & Verification Checklist
+
+### System Health Diagnostic
+Verify your live backend health:
+```bash
+curl -s https://<your-render-backend-url>/health | jq
+```
+Expected production response:
+```json
+{
+  "status": "healthy",
+  "app": "ReferralPilot AI",
+  "version": "1.0.0",
+  "environment": "production",
+  "database": {
+    "status": "connected",
+    "latency_ms": 15.4
+  },
+  "stats": {
+    "persisted_opportunities": 0
+  }
+}
+```
+
+### Initial Opportunity Discovery
+Once deployed against a fresh database, initial metrics will display `0` until discovery is executed.
+Trigger live multi-source discovery using:
+1. **Frontend UI**: Click the green **"Run Discovery Now"** button in the dashboard sidebar.
+2. **API Endpoint**:
+   ```bash
+   curl -X POST https://<your-render-backend-url>/api/discovery/run \
+        -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
+   ```
+3. **Automated Cron**: The Render Cron Job will run automatically every day at 09:00 AM IST (`30 3 * * *` UTC).
+
+---
+
+## 6. Production Troubleshooting Matrix
+
+| Symptom | Probable Cause | Remediation |
+| :--- | :--- | :--- |
+| `HTTP 405 Method Not Allowed` | Frontend POST routed to static `/index.html` | Ensure `vercel.json` proxy rewrites are present and redeploy Vercel. |
+| `No config file 'alembic.ini' found` | Render build executed from repo root | Ensure root `alembic.ini` is present or set Render **Root Directory** to `backend`. |
+| `psycopg.OperationalError: connection failed` | Supabase IPv6 direct host blocked on Render IPv4 | Switch connection string to Supabase Pooler (`pooler.supabase.com:5432`) with `?sslmode=require`. |
+| `401 Authentication required` | Calling protected endpoints without JWT | Log in through `/api/auth/login` to obtain an access token. |
+| `CORS Error in Browser Console` | Vercel domain not listed in backend `CORS_ORIGINS` | Add `https://<your-vercel-domain>.vercel.app` to `FRONTEND_URL` and `CORS_ORIGINS` in Render settings. |
+
 
