@@ -158,6 +158,8 @@ class OpportunitySummaryOut(BaseModel):
     organization: str
     category: str
     subcategory: Optional[str] = None
+    opportunity_type: str = "JOB"
+    application_status: str = "OPEN"
     description: str
     location: str
     is_remote: bool
@@ -346,6 +348,9 @@ class DashboardSummaryOut(BaseModel):
     upcoming_deadlines: int
     follow_ups_due: int
     total_opportunities: int
+    active_vacancies: int = 0
+    research_papers: int = 0
+    closed_opportunities: int = 0
     latest_run: Optional[DiscoveryRunOut] = None
 
 
@@ -360,6 +365,8 @@ class DashboardAnalyticsOut(BaseModel):
     application_pipeline: List[AnalyticsSeriesPoint]
     score_distribution: List[AnalyticsSeriesPoint]
     outreach_status: List[AnalyticsSeriesPoint]
+    by_opportunity_type: List[AnalyticsSeriesPoint] = []
+    by_application_status: List[AnalyticsSeriesPoint] = []
 
 
 class ScoringWeightsUpdate(BaseModel):

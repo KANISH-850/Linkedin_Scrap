@@ -148,6 +148,10 @@ class Opportunity(Base, TimestampMixin):
     category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     # referrals | internships | fresher_jobs | hackathons | scholarships | courses | research
     subcategory: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    opportunity_type: Mapped[str] = mapped_column(String(50), default="JOB", nullable=False)
+    # JOB | INTERNSHIP | HACKATHON | SCHOLARSHIP | COURSE | CERTIFICATION | RESEARCH_PAPER | RESEARCH_POSITION | OTHER
+    application_status: Mapped[str] = mapped_column(String(50), default="OPEN", nullable=False)
+    # OPEN | CLOSED | UPCOMING | EXPIRED | NOT_APPLICABLE
     description: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str] = mapped_column(String(200), default="Not specified", nullable=False)
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
