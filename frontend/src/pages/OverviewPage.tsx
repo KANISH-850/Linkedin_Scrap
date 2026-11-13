@@ -4,10 +4,10 @@ import {
   Sparkles,
   Users2,
   Send,
-  MessageSquare,
   Clock,
   ArrowUpRight,
   TrendingUp,
+  BookOpen,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -42,11 +42,11 @@ export function OverviewPage() {
   }
 
   const statCards = [
-    { label: 'New Opportunities', value: summary?.new_opportunities ?? 0, icon: Sparkles, color: 'text-indigo-500' },
+    { label: 'Active Vacancies', value: summary?.active_vacancies ?? summary?.new_opportunities ?? 0, icon: Sparkles, color: 'text-indigo-500' },
     { label: 'High-Match (>=75)', value: summary?.high_match_opportunities ?? 0, icon: TrendingUp, color: 'text-emerald-500' },
     { label: 'Referrals In Progress', value: summary?.referrals_in_progress ?? 0, icon: Users2, color: 'text-amber-500' },
     { label: 'Applications Submitted', value: summary?.applications_submitted ?? 0, icon: Send, color: 'text-sky-500' },
-    { label: 'Replies Received', value: summary?.replies_received ?? 0, icon: MessageSquare, color: 'text-purple-500' },
+    { label: 'AI/ML Research Preprints', value: summary?.research_papers ?? 0, icon: BookOpen, color: 'text-purple-500' },
     { label: 'Follow-ups Due', value: summary?.follow_ups_due ?? 0, icon: Clock, color: 'text-rose-500' },
   ];
 

@@ -122,6 +122,8 @@ export interface OpportunitySummary {
   last_verified_at?: string | null;
   active_status: string;
   verification_status: string;
+  opportunity_type?: string | null;
+  application_status?: string | null;
   source_url: string;
   application_url?: string | null;
   referral_classification?: string | null;
@@ -229,6 +231,9 @@ export interface DashboardSummary {
   upcoming_deadlines: number;
   follow_ups_due: number;
   total_opportunities: number;
+  active_vacancies?: number;
+  research_papers?: number;
+  closed_opportunities?: number;
   latest_run?: DiscoveryRun | null;
 }
 
@@ -243,6 +248,8 @@ export interface DashboardAnalytics {
   application_pipeline: AnalyticsSeriesPoint[];
   score_distribution: AnalyticsSeriesPoint[];
   outreach_status: AnalyticsSeriesPoint[];
+  by_opportunity_type?: AnalyticsSeriesPoint[];
+  by_application_status?: AnalyticsSeriesPoint[];
 }
 
 export interface ReplyAnalyzeResponse {

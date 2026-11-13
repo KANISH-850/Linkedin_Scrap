@@ -38,12 +38,22 @@ export function OpportunityCard({ opp, onStatusChange }: OpportunityCardProps) {
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 capitalize">
                 {opp.category.replace('_', ' ')}
               </span>
+              {opp.opportunity_type && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">
+                  {opp.opportunity_type.replace('_', ' ')}
+                </span>
+              )}
+              {opp.application_status === 'CLOSED' && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  Closed
+                </span>
+              )}
               {opp.referral_classification === 'confirmed_referral_offer' && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
                   Confirmed Referral
                 </span>
               )}
-              {opp.verification_status === 'verified' && (
+              {(opp.verification_status === 'VERIFIED_ACTIVE' || opp.verification_status === 'verified') && (
                 <span className="text-[11px] font-medium text-emerald-500 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> Verified
                 </span>
