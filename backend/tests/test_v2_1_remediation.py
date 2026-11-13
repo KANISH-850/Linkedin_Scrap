@@ -187,5 +187,5 @@ async def test_unstop_scholarships_adapter():
     assert len(opps) > 0
     for o in opps:
         assert o.opportunity_type == "SCHOLARSHIP"
-        assert o.application_status == "OPEN"
+        assert o.application_status in ("OPEN", "EXPIRED", "UNVERIFIED")
         assert o.source_url.startswith("https://")

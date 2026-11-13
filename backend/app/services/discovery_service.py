@@ -202,10 +202,18 @@ class DiscoveryEngine:
             from app.discovery.base import verify_url_deep
             verif_status, dest_title, _ = await verify_url_deep(target_check_url, expected_title=raw.title)
 
+        # Determine effective deadline
+        effective_deadline = raw.deadline
+        if not effective_deadline and extracted.deadline:
+            try:
+                effective_deadline = datetime.fromisoformat(extracted.deadline[:10]).date()
+            except Exception:
+                effective_deadline = None
+
         # Determine application status
         if raw.opportunity_type == "RESEARCH_PAPER":
             app_status = "NOT_APPLICABLE"
-        elif raw.deadline and raw.deadline < date.today():
+        elif effective_deadline and effective_deadline < date.today():
             app_status = "EXPIRED"
         elif verif_status in [VerificationState.CLOSED, "CLOSED"]:
             app_status = "CLOSED"
@@ -230,10 +238,10 @@ class DiscoveryEngine:
             location=raw.location if raw.location != "Not specified" else extracted.location,
             is_remote=raw.is_remote or extracted.is_remote,
             is_hybrid=raw.is_hybrid or extracted.is_hybrid,
-            deadline=raw.deadline,
+            deadline=effective_deadline,
             posted_at=raw.posted_at,
-            active_status="active" if verif_status not in ["CLOSED", "EXPIRED"] else "closed",
-            verification_status=verif_status,
+            active_status="closed" if app_status in ["CLOSED", "EXPIRED"] else ("active" if app_status == "OPEN" else "unverified"),
+            verification_status="EXPIRED" if app_status == "EXPIRED" else verif_status,
             canonical_url=canonical,
             source_url=raw.source_url,
             application_url=raw.application_url,

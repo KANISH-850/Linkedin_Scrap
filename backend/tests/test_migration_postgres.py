@@ -107,7 +107,7 @@ def test_alembic_migration_on_postgres(postgres_disposable_db):
         saved_opp = session.query(Opportunity).filter(Opportunity.dedup_hash == "hash001").first()
         assert saved_opp is not None
         assert saved_opp.opportunity_type == "JOB"  # Default
-        assert saved_opp.application_status == "OPEN"  # Default
+        assert saved_opp.application_status == "UNVERIFIED"  # Audited safe default
 
     # Dispose connection pool before downgrade/drop
     engine.dispose()
@@ -122,11 +122,12 @@ def test_alembic_migration_on_postgres(postgres_disposable_db):
     )
     assert res_down.returncode == 0, f"Alembic downgrade failed: {res_down.stderr}\n{res_down.stdout}"
 
-    # Verify column was dropped
+    # Verify column default was rolled back to OPEN on ed7eabf5ed40
     engine2 = create_engine(DISPOSABLE_URL)
     inspector_down = inspect(engine2)
     opp_cols_down = {c["name"]: c for c in inspector_down.get_columns("opportunities")}
-    assert "opportunity_type" not in opp_cols_down
+    assert "application_status" in opp_cols_down
+    assert "'OPEN'" in (opp_cols_down["application_status"]["default"] or "")
     engine2.dispose()
 
     # Re-upgrade to head

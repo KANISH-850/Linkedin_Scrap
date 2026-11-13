@@ -1,6 +1,6 @@
 """Permitted public source adapters for ReferralPilot AI."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, List
 from bs4 import BeautifulSoup
 import feedparser
@@ -467,6 +467,8 @@ class UnstopAdapter(BaseSourceAdapter):
                 else ("INTERNSHIP" if raw_cat == "internships"
                 else ("SCHOLARSHIP" if raw_cat == "scholarships" else "JOB"))
             )
+            is_past_deadline = bool(dl and dl < date.today())
+            app_status = "EXPIRED" if is_past_deadline else ("OPEN" if dl and dl >= date.today() else "UNVERIFIED")
             desc = f"{title} organized by {org_name}. Register on Unstop before deadline."
             results.append(
                 RawOpportunity(
@@ -477,7 +479,7 @@ class UnstopAdapter(BaseSourceAdapter):
                     application_url=link,
                     category_hint=raw_cat,
                     opportunity_type=opp_type_enum,
-                    application_status="OPEN",
+                    application_status=app_status,
                     location="India / Online",
                     is_remote=True,
                     deadline=dl,
