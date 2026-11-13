@@ -39,14 +39,24 @@
 
 ## 3. Backend & Cron Deployment (Render)
 
-Render uses `render.yaml` in this repository for single-click Blueprint deployment.
-
+### Option A: Using Blueprint (Recommended)
+Render uses `render.yaml` in this repository for automatic multi-service deployment.
 1. Push this repository to GitHub.
 2. In [Render Dashboard](https://dashboard.render.com), click **New** -> **Blueprint**.
-3. Connect your repository. Render will automatically detect the two services in `render.yaml`:
-   - `referralpilot-ai-backend` (Web Service)
-   - `referralpilot-ai-daily-discovery` (Cron Job scheduled at `30 3 * * *` UTC = 09:00 AM IST)
-4. Fill in the environment variables:
+3. Connect your repository. Render will automatically configure both services:
+   - `referralpilot-ai-backend` (Web Service, rootDir: `backend`)
+   - `referralpilot-ai-daily-discovery` (Cron Job, rootDir: `backend`, schedule: `30 3 * * *` UTC = 9:00 AM IST)
+
+### Option B: Manual Web Service Setup
+If configuring the service manually in the Render dashboard:
+1. Click **New** -> **Web Service** -> Connect repository.
+2. Configure settings:
+   - **Root Directory**: `backend` *(CRITICAL: must be set to `backend`)*
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt && alembic upgrade head`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Environment Variable**: `PYTHON_VERSION` = `3.11.9`
+3. Fill in the environment variables:
    - `DATABASE_URL`: Your Supabase connection string.
    - `SECRET_KEY`: A 64-character random string.
    - `ADMIN_EMAIL`: Your initial login email (e.g. `admin@referralpilot.app`).

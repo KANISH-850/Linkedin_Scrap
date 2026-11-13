@@ -1,6 +1,7 @@
 """Test Alembic migrations against a real disposable PostgreSQL database."""
 
 import os
+import sys
 import subprocess
 import psycopg
 import pytest
@@ -28,12 +29,14 @@ def postgres_disposable_db():
 def test_alembic_migration_on_postgres(postgres_disposable_db):
     env = os.environ.copy()
     env["DATABASE_URL"] = DISPOSABLE_URL
-    env["PYTHONPATH"] = "."
+    from pathlib import Path
+    backend_dir = Path(__file__).resolve().parent.parent
+    env["PYTHONPATH"] = str(backend_dir)
 
     # 1. Run alembic upgrade head
     res = subprocess.run(
-        [".\\.venv\\Scripts\\alembic.exe", "upgrade", "head"],
-        cwd=".",
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=str(backend_dir),
         env=env,
         capture_output=True,
         text=True,
@@ -114,8 +117,8 @@ def test_alembic_migration_on_postgres(postgres_disposable_db):
 
     # 4. Test Alembic downgrade to verify rollback safety
     res_down = subprocess.run(
-        [".\\.venv\\Scripts\\alembic.exe", "downgrade", "-1"],
-        cwd=".",
+        [sys.executable, "-m", "alembic", "downgrade", "-1"],
+        cwd=str(backend_dir),
         env=env,
         capture_output=True,
         text=True,
@@ -132,8 +135,8 @@ def test_alembic_migration_on_postgres(postgres_disposable_db):
 
     # Re-upgrade to head
     res_up = subprocess.run(
-        [".\\.venv\\Scripts\\alembic.exe", "upgrade", "head"],
-        cwd=".",
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=str(backend_dir),
         env=env,
         capture_output=True,
         text=True,

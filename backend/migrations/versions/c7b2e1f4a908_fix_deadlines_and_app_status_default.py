@@ -48,3 +48,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table('opportunities', schema=None) as batch_op:
         batch_op.alter_column('application_status', server_default='OPEN')
+

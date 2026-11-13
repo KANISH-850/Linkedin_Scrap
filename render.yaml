@@ -7,6 +7,8 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ENVIRONMENT
         value: production
       - key: SCHEDULER_TIMEZONE
@@ -43,6 +45,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python -m app.scheduler.scheduler render_cron
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ENVIRONMENT
         value: production
       - key: SCHEDULER_TIMEZONE
