@@ -53,27 +53,65 @@ def _detect_referral_classification(text: str) -> Tuple[str, float, str | None]:
       - UNCLEAR: Ambiguous or insufficient evidence.
     """
     t = text.lower()
+
+    # Disqualification: mentions receiving a referral in the past
+    if re.search(r"\b(i received a referral|got a referral from|referred by|my referral was)\b", t):
+        return ("UNCLEAR", 0.15, "Past referral mention by applicant; not an offer to refer candidates.")
+
+    # Disqualification: generic company referral program mention without author offer
+    if re.search(r"\b(referral program available|company has a referral policy|referral bonus)\b", t) and not re.search(r"\b(dm me|reach out|contact me|message me|i can refer|happy to refer)\b", t):
+        return ("UNCLEAR", 0.20, "General mention of corporate referral program without explicit personal referral offer.")
+
     # 1. Confirmed referral offer requires explicit author commitment
     offer_patterns = [
-        r"\b(i can refer|happy to refer|dm me for referral|reach out for referral|offering referrals?|willing to refer)\b",
-        r"\b(send me your resume for referral|drop your resume for referral|message me to be referred)\b",
+        (r"\b(i('m| am) referring|i can refer|happy to refer|willing to refer|ready to refer|offering referrals?)\b", "Direct referral offer"),
+        (r"\b(dm me (?:for|if you need|to get)?\s*(?:a\s+)?referral)\b", "Direct message referral invitation"),
+        (r"\b(reach out (?:for|if you need)?\s*(?:a\s+)?referral)\b", "Reach out for referral invitation"),
+        (r"\b(message me (?:for|if you need)?\s*(?:a\s+)?referral)\b", "Message invitation for referral"),
+        (r"\b(send (?:me )?(?:your )?resume (?:for|to get)?\s*(?:a\s+)?referral)\b", "Resume request for referral"),
+        (r"\b(drop (?:your )?resume (?:for|to get)?\s*(?:a\s+)?referral)\b", "Resume submission for referral"),
     ]
-    for pat in offer_patterns:
+    for pat, label in offer_patterns:
         match = re.search(pat, t)
         if match:
-            return ("CONFIRMED_REFERRAL_OFFER", 0.95, f"Explicit author referral offer verified: '{match.group(0)}'.")
+            return ("CONFIRMED_REFERRAL_OFFER", 0.95, f"Explicit author referral offer verified: '{match.group(0)}' ({label}).")
 
-    # 2. Explicit referral request
-    if re.search(r"\b(anyone can refer|looking for a referral|seeking a referral|need a referral)\b", t):
-        return ("EXPLICIT_REFERRAL_REQUEST", 0.85, "Explicit request for referral from candidate.")
+    # 2. Explicit referral request from candidate
+    request_patterns = [
+        r"\b(does anyone have a referral|can anyone refer me|looking for a referral|seeking a referral|need a referral|anyone can refer)\b",
+        r"\b(could someone refer me|any referrals? available for)\b"
+    ]
+    for pat in request_patterns:
+        match = re.search(pat, t)
+        if match:
+            return ("EXPLICIT_REFERRAL_REQUEST", 0.85, f"Explicit request for referral from candidate: '{match.group(0)}'.")
 
-    # 3. Hiring announcement
-    if re.search(r"\b(we are hiring|my team is hiring|i am hiring|our team has an opening|dm me if interested)\b", t):
-        return ("HIRING_ANNOUNCEMENT", 0.70, "Team hiring post with direct outreach opportunity.")
+    # If explicit online application link is given (e.g. "apply at ...", "careers.company.com") and no DM invitation:
+    # it is a standard job post / listing.
+    if re.search(r"\b(apply (?:at|online|via|through)|careers?\.[a-z0-9\.\-]+)\b", t) and not re.search(r"\b(dm me|reach out directly|send message|message me)\b", t):
+        match = re.search(r"\b(apply (?:at|online|via|through)|careers?\.[a-z0-9\.\-]+)\b", t)
+        return ("GENERAL_JOB_POST", 0.50, f"Standard job post directing to online application: '{match.group(0)}'.")
 
-    # 4. General job post
-    if re.search(r"\b(apply here|job opening|apply at|job description|apply online)\b", t):
-        return ("GENERAL_JOB_POST", 0.30, "General job posting without verified author referral.")
+    # 3. Hiring announcement (team/company hiring announcement)
+    hiring_patterns = [
+        r"\b(we are hiring|my team is hiring|i am hiring|our team has an opening)\b",
+        r"\b([a-z0-9\.\-]+ is hiring|now hiring|hiring for multiple|startup is hiring)\b",
+        r"\b(excited to announce (?:that )?(?:we are|our|startup)?\s*hiring)\b",
+        r"\b(dm (?:me )?if interested|reach out directly if interested|interested candidates can dm)\b"
+    ]
+    for pat in hiring_patterns:
+        match = re.search(pat, t)
+        if match:
+            return ("HIRING_ANNOUNCEMENT", 0.70, f"Team hiring announcement verified: '{match.group(0)}'.")
+
+    # 4. General job post (advertisement, corporate announcement, application instructions)
+    general_patterns = [
+        r"\b(role open|job opening|job post|job description|apply here|apply now|recruiting for)\b",
+    ]
+    for pat in general_patterns:
+        match = re.search(pat, t)
+        if match:
+            return ("GENERAL_JOB_POST", 0.35, f"General job posting verified: '{match.group(0)}'.")
 
     return ("UNCLEAR", 0.10, "Insufficient evidence to classify referral availability.")
 
@@ -115,6 +153,7 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
             referral_classification=ref_class,
             referral_confidence=ref_conf,
             referral_instructions=ref_note,
+            referral_evidence_excerpt=ref_note,
             required_skills=skills[:8],
             graduation_year_requirement=grad_req,
             experience_requirement=exp_req,
@@ -153,6 +192,18 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
                     f"Mandatory experience required: {exp_req} (candidate is currently an undergraduate student)."
                 )
 
+        # Check senior positions conflict
+        title_lower = (opportunity_data.get("title") or "").lower()
+        senior_title_pattern = r"\b(senior|sr\.?|lead|staff|principal|director|head of|vp|vice president|architect|engineering manager)\b"
+        is_senior_title = bool(re.search(senior_title_pattern, title_lower))
+        senior_exp_pattern = r"\b([4-9]|\d{2})\+?\s*(?:years?|yrs?)\b"
+        has_senior_exp = bool(re.search(senior_exp_pattern, exp_req or desc_lower[:800]))
+
+        if (is_senior_title or has_senior_exp) and "intern" not in title_lower and "intern" not in opportunity_data.get("category", ""):
+            disqualifying.append(
+                f"Role targets senior/experienced professionals ({opportunity_data.get('title')}); candidate is a 2028 undergraduate."
+            )
+
         # Immediate joining requirement flag
         if re.search(r"\b(immediate joiner|can join immediately|available immediately)\b", desc_lower):
             questions.append("Requires immediate joining. Verify if student schedule / college NOC permits.")
@@ -174,10 +225,31 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
         pos = candidate_profile.get("target_career_positioning", "AI Engineer").lower()
         title_lower = opportunity_data.get("title", "").lower()
         relevance_score = 95.0 if any(k in title_lower for k in ["ai", "machine learning", "python", "nlp", "genai", "deep learning"]) else 65.0
-        # 4. Location Score
-        loc_str = opportunity_data.get("location", "").lower()
-        is_rem = opportunity_data.get("is_remote", False)
-        location_score = 100.0 if (is_rem or "india" in loc_str or "remote" in loc_str) else 60.0
+        
+        # Intern / Student / 2028 batch boost
+        is_student_friendly = any(k in title_lower or k in desc_lower[:500] for k in ["intern", "internship", "fresher", "trainee", "student", "2028", "pre-final", "undergraduate", "campus", "scholarship", "hackathon"])
+        if is_student_friendly and status != "Not eligible":
+            relevance_score = min(100.0, relevance_score + 10.0)
+            elig_score = min(100.0, elig_score + 5.0)
+
+        # 4. Location Score (Indian candidate: Coimbatore, TN, Bangalore, Hyderabad, Chennai, Pune, Mumbai, Delhi-NCR, Remote)
+        loc_str = (opportunity_data.get("location") or "").lower()
+        is_rem = opportunity_data.get("is_remote", False) or "remote" in loc_str
+        indian_cities = [
+            "coimbatore", "tamil nadu", "bengaluru", "bangalore", "chennai",
+            "hyderabad", "pune", "mumbai", "delhi", "noida", "gurgaon", "gurugram", "india"
+        ]
+        is_indian_loc = any(c in loc_str for c in indian_cities)
+
+        if "coimbatore" in loc_str or "tamil nadu" in loc_str:
+            location_score = 100.0  # Home institution region (Bannari Amman Institute of Technology)
+        elif is_rem or is_indian_loc:
+            location_score = 95.0
+        elif any(f in loc_str for f in ["us", "usa", "united states", "uk", "germany", "europe", "london", "canada", "singapore"]):
+            location_score = 30.0  # Onsite abroad role without remote option
+        else:
+            location_score = 65.0
+
         # 5. Referral & Freshness
         ref_class = opportunity_data.get("referral_classification") or ""
         ref_fresh_score = (
@@ -223,15 +295,15 @@ class HeuristicIntelligenceEngine(BaseLLMClient):
             summary=elig_summary,
         )
 
-        action = (
-            "Review disqualifying requirements"
-            if status == "Not eligible"
-            else (
-                "Request employee referral with tailored pitch"
-                if ref_class in {"CONFIRMED_REFERRAL_OFFER", "HIRING_ANNOUNCEMENT"}
-                else "Review opportunity details and apply"
-            )
-        )
+        opp_type = (opportunity_data.get("opportunity_type") or "").upper()
+        if opp_type == "RESEARCH_PAPER":
+            action = "Read research preprint / study architecture"
+        elif status == "Not eligible":
+            action = "Review disqualifying requirements"
+        elif ref_class in {"CONFIRMED_REFERRAL_OFFER", "HIRING_ANNOUNCEMENT"}:
+            action = "Request employee referral with tailored pitch"
+        else:
+            action = "Review opportunity details and apply"
 
         scoring_result = AIScoringResult(
             overall_score=round(overall, 1),
