@@ -1,7 +1,7 @@
 """Discovery orchestrator: coordinates sources, deduplication, AI processing, DB persistence, and alerts."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import uuid
 from sqlalchemy.orm import Session
 
