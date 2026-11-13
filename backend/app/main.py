@@ -34,12 +34,33 @@ async def lifespan(app: FastAPI):
     yield
 
 
+OPENAPI_TAGS = [
+    {"name": "System", "description": "System health diagnostics, database connectivity, and uptime monitoring."},
+    {"name": "Auth", "description": "JWT-based authentication, user registration, and access token validation."},
+    {"name": "Profile", "description": "Candidate positioning target, skills, graduation batch, and education management."},
+    {"name": "Discovery", "description": "Multi-source discovery runs, scheduler execution, and source adapter metrics."},
+    {"name": "Opportunities", "description": "Verified opportunities, classification badges, and manual link submission."},
+    {"name": "Applications", "description": "Application lifecycle tracking, referral requests, and interview status."},
+    {"name": "Interactions", "description": "Networking interactions, outreach logging, and referral conversation records."},
+    {"name": "Follow-ups", "description": "Automated schedule reminders and pending networking follow-ups."},
+    {"name": "Analytics", "description": "Candidate conversion funnel, match score distribution, and source performance."},
+    {"name": "Telegram", "description": "Telegram webhook handlers for mobile post capture and automated notifications."},
+]
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
         version="1.0.0",
-        description="Personal AI-powered career opportunity intelligence and referral management assistant.",
+        description=(
+            "ReferralPilot AI is an autonomous career intelligence and opportunity discovery platform "
+            "engineered for engineering students and graduates to target high-ROI referrals, internships, "
+            "hackathons, scholarships, and AI/ML research programs."
+        ),
+        openapi_tags=OPENAPI_TAGS,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
     )
 
