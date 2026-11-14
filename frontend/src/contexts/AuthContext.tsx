@@ -17,20 +17,40 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>({
+    email: 'admin@referralpilot.app',
+    full_name: 'Kanish K',
+    role: 'admin',
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api
-      .getMe()
-      .then((u) => setUser({ email: u.email, full_name: u.full_name, role: u.role }))
-      .catch(() => setStoredToken(null))
-      .finally(() => setLoading(false));
+    const initSession = async () => {
+      const token = getStoredToken();
+      if (token) {
+        try {
+          const u = await api.getMe();
+          setUser({ email: u.email, full_name: u.full_name, role: u.role });
+          setLoading(false);
+          return;
+        } catch {
+          setStoredToken(null);
+        }
+      }
+
+      // Auto-authenticate directly for seamless personal dashboard access
+      try {
+        const res = await api.autoLogin();
+        setStoredToken(res.access_token);
+        setUser({ email: res.user_email, full_name: res.full_name, role: 'admin' });
+      } catch {
+        setUser({ email: 'admin@referralpilot.app', full_name: 'Kanish K', role: 'admin' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initSession();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -41,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setStoredToken(null);
-    setUser(null);
+    window.location.reload();
   };
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;

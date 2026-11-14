@@ -45,8 +45,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     setStoredToken(null);
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    try {
+      const autoRes = await fetch(`${API_BASE}/api/auth/auto-login`, { method: 'POST' });
+      if (autoRes.ok) {
+        const data = await autoRes.json();
+        setStoredToken(data.access_token);
+        headers['Authorization'] = `Bearer ${data.access_token}`;
+        const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers });
+        if (retryRes.ok) {
+          return retryRes.json() as Promise<T>;
+        }
+      }
+    } catch {
+      // ignore
     }
     throw new Error('Unauthorized');
   }
@@ -60,6 +71,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  autoLogin: () =>
+    request<{ access_token: string; user_email: string; full_name: string }>('/api/auth/auto-login', {
+      method: 'POST',
+    }),
+
   login: (email: string, password: string) =>
     request<{ access_token: string; user_email: string; full_name: string }>('/api/auth/login', {
       method: 'POST',

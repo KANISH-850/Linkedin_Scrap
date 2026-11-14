@@ -13,7 +13,6 @@ import { ApplicationsPage } from './pages/ApplicationsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SourcesPage } from './pages/SourcesPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { LoginPage } from './pages/LoginPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,12 +25,9 @@ const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">Loading ReferralPilot AI...</div>;
-  }
-  if (!user) {
-    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
@@ -43,7 +39,7 @@ export function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/login" element={<LoginPage />} />
+              <Route path="/login" element={<Navigate to="/" replace />} />
               <Route
                 path="/"
                 element={

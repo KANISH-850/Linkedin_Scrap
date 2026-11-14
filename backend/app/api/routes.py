@@ -107,6 +107,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=token, user_email=user.email, full_name=user.full_name)
 
 
+@router.api_route("/api/auth/auto-login", methods=["GET", "POST"], response_model=TokenResponse, tags=["Auth"])
+def auto_login(db: Session = Depends(get_db)):
+    """Single-user direct access: generates a valid access token for the active account."""
+    user = db.query(UserAccount).filter(UserAccount.is_active.is_(True)).order_by(UserAccount.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active user account found.",
+        )
+    token = create_access_token(subject=user.email, role=user.role, expires_minutes=60 * 24 * 365)
+    return TokenResponse(access_token=token, user_email=user.email, full_name=user.full_name)
+
+
 @router.get("/api/auth/me", response_model=UserAccountOut, tags=["Auth"])
 def get_me(current_user: UserAccount = Depends(get_current_user)):
     return current_user

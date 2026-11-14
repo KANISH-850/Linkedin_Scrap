@@ -17,7 +17,6 @@ import {
   Settings,
   Sun,
   Moon,
-  LogOut,
   Menu,
   X,
   PlusCircle,
@@ -46,7 +45,7 @@ const navItems = [
 ];
 
 export function DashboardLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [runningDiscovery, setRunningDiscovery] = useState(false);
@@ -195,13 +194,6 @@ export function DashboardLayout() {
               title="Toggle theme"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={logout}
-              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
